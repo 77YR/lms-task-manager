@@ -5,6 +5,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+import com.lmstaskmanager.app.ui.theme.HomeScreen
+
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Schedule : Screen("schedule")
@@ -20,7 +22,7 @@ fun AppNavigation() {
         startDestination = Screen.Home.route
     ) {
         composable(Screen.Home.route) {
-            // HomeScreen() — coming soon
+            HomeScreen()
         }
         composable(Screen.Schedule.route) {
             // ScheduleScreen() — coming soon
