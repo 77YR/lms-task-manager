@@ -14,13 +14,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.graphics.toColorInt
 import com.lmstaskmanager.app.model.Task
 import com.lmstaskmanager.app.model.TaskStatus
 import com.lmstaskmanager.app.repository.TaskRepository
+import kotlin.math.roundToInt
 
 data class DragState(
     val isDragging: Boolean = false,
@@ -33,53 +37,97 @@ fun HomeScreen() {
     var tasks by remember { mutableStateOf(TaskRepository.tasks.toList()) }
     var dragState by remember { mutableStateOf(DragState()) }
     val columnBounds = remember { mutableMapOf<TaskStatus, androidx.compose.ui.geometry.Rect>() }
+    val density = LocalDensity.current
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Text(
-                text = "My Tasks",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        item {
-            KanbanBoard(
-                tasks = tasks,
-                dragState = dragState,
-                onDragStart = { task, globalOffset ->
-                    dragState = DragState(true, task, globalOffset)
-                },
-                onDrag = { dragAmount ->
-                    dragState = dragState.copy(
-                        dragPosition = dragState.dragPosition + dragAmount
-                    )
-                },
-                onDragEnd = {
-                    dragState.draggedTask?.let { task ->
-                        val pos = dragState.dragPosition
-                        val newStatus = columnBounds.entries.firstOrNull { (_, bounds) ->
-                            pos.x in bounds.left..bounds.right &&
-                                    pos.y in bounds.top..bounds.bottom
-                        }?.key
-                        if (newStatus != null && newStatus != task.status) {
-                            tasks = tasks.map {
-                                if (it.id == task.id) it.copy(status = newStatus) else it
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF5F5F5))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text(
+                    text = "My Tasks",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            item {
+                KanbanBoard(
+                    tasks = tasks,
+                    dragState = dragState,
+                    onDragStart = { task, globalOffset ->
+                        dragState = DragState(true, task, globalOffset)
+                    },
+                    onDrag = { dragAmount ->
+                        dragState = dragState.copy(
+                            dragPosition = dragState.dragPosition + dragAmount
+                        )
+                    },
+                    onDragEnd = {
+                        dragState.draggedTask?.let { task ->
+                            val pos = dragState.dragPosition
+                            val newStatus = columnBounds.entries.firstOrNull { (_, bounds) ->
+                                pos.x in bounds.left..bounds.right &&
+                                        pos.y in bounds.top..bounds.bottom
+                            }?.key
+                            if (newStatus != null && newStatus != task.status) {
+                                tasks = tasks.map {
+                                    if (it.id == task.id) it.copy(status = newStatus) else it
+                                }
+                                TaskRepository.updateTaskStatus(task.id, newStatus)
                             }
-                            TaskRepository.updateTaskStatus(task.id, newStatus)
                         }
+                        dragState = DragState()
+                    },
+                    onColumnBoundsChanged = { status, bounds ->
+                        columnBounds[status] = bounds
                     }
-                    dragState = DragState()
-                },
-                onColumnBoundsChanged = { status, bounds ->
-                    columnBounds[status] = bounds
+                )
+            }
+        }
+
+        // Drag shadow overlay
+        if (dragState.isDragging && dragState.draggedTask != null) {
+            val task = dragState.draggedTask!!
+            val course = TaskRepository.courses.find { it.id == task.courseId }
+            val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Color.Gray
+
+            Card(
+                modifier = Modifier
+                    .width(120.dp)
+                    .zIndex(10f)
+                    .offset {
+                        IntOffset(
+                            (dragState.dragPosition.x - with(density) { 60.dp.toPx() }).roundToInt(),
+                            (dragState.dragPosition.y - with(density) { 30.dp.toPx() }).roundToInt()
+                        )
+                    },
+                shape = RoundedCornerShape(6.dp),
+                elevation = CardDefaults.cardElevation(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = task.title,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(courseColor, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = course?.name ?: "No Course",
+                            fontSize = 9.sp,
+                            color = Color.White
+                        )
+                    }
                 }
-            )
+            }
         }
     }
 }
@@ -181,6 +229,10 @@ fun DraggableTaskCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (isDragging) Modifier.background(Color.Transparent)
+                else Modifier
+            )
             .onGloballyPositioned { coords ->
                 cardWindowPosition = coords.positionInWindow()
             }
@@ -198,20 +250,35 @@ fun DraggableTaskCard(
                 )
             },
         shape = RoundedCornerShape(6.dp),
-        elevation = CardDefaults.cardElevation(if (isDragging) 8.dp else 2.dp)
+        elevation = CardDefaults.cardElevation(if (isDragging) 0.dp else 2.dp)
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Text(text = task.title, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .then(
+                    if (isDragging) Modifier.background(Color(0xFFEEEEEE))
+                    else Modifier
+                )
+        ) {
+            Text(
+                text = task.title,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isDragging) Color.Transparent else Color.Unspecified
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Box(
                 modifier = Modifier
-                    .background(courseColor, RoundedCornerShape(4.dp))
+                    .background(
+                        if (isDragging) Color.Transparent else courseColor,
+                        RoundedCornerShape(4.dp)
+                    )
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
                     text = course?.name ?: "No Course",
                     fontSize = 9.sp,
-                    color = Color.White
+                    color = Color.Transparent
                 )
             }
         }
