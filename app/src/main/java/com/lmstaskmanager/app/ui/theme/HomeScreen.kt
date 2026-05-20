@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -51,6 +52,7 @@ fun HomeScreen() {
     val columnBounds = remember { mutableMapOf<TaskStatus, androidx.compose.ui.geometry.Rect>() }
     val density = LocalDensity.current
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedTask by remember { mutableStateOf<Task?>(null) }
 
     LaunchedEffect(Unit) {
         val db = DatabaseManager.getDatabase(context)
@@ -119,11 +121,50 @@ fun HomeScreen() {
                         }
                         dragState = DragState()
                     },
+                    onTap = { task -> selectedTask = task },
                     onColumnBoundsChanged = { status, bounds ->
                         columnBounds[status] = bounds
                     }
                 )
             }
+        }
+
+        selectedTask?.let { task ->
+            EditTaskDialog(
+                task = task,
+                onDismiss = { selectedTask = null },
+                onSave = { updated ->
+                    tasks = tasks.map { if (it.id == updated.id) updated else it }
+                    TaskRepository.updateTaskStatus(updated.id, updated.status)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        DatabaseManager.getDatabase(context).taskDao().upsertTask(
+                            TaskEntity(
+                                id = updated.id,
+                                title = updated.title,
+                                status = updated.status.name,
+                                courseId = updated.courseId,
+                                source = updated.source.name
+                            )
+                        )
+                    }
+                    selectedTask = null
+                },
+                onDelete = { taskToDelete ->
+                    tasks = tasks.filter { it.id != taskToDelete.id }
+                    CoroutineScope(Dispatchers.IO).launch {
+                        DatabaseManager.getDatabase(context).taskDao().deleteTask(
+                            TaskEntity(
+                                id = taskToDelete.id,
+                                title = taskToDelete.title,
+                                status = taskToDelete.status.name,
+                                courseId = taskToDelete.courseId,
+                                source = taskToDelete.source.name
+                            )
+                        )
+                    }
+                    selectedTask = null
+                }
+            )
         }
 
         if (showAddDialog) {
@@ -197,6 +238,7 @@ fun KanbanBoard(
     onDragStart: (Task, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
+    onTap: (Task) -> Unit,
     onColumnBoundsChanged: (TaskStatus, androidx.compose.ui.geometry.Rect) -> Unit
 ) {
     val columns = listOf(
@@ -219,6 +261,7 @@ fun KanbanBoard(
                 onDragStart = onDragStart,
                 onDrag = onDrag,
                 onDragEnd = onDragEnd,
+                onTap = onTap,
                 onBoundsChanged = { bounds -> onColumnBoundsChanged(status, bounds) }
             )
         }
@@ -235,6 +278,7 @@ fun KanbanColumn(
     onDragStart: (Task, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
+    onTap: (Task) -> Unit,
     onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit
 ) {
     val isDropTarget = dragState.isDragging &&
@@ -263,7 +307,8 @@ fun KanbanColumn(
                 isDragging = dragState.draggedTask?.id == task.id,
                 onDragStart = onDragStart,
                 onDrag = onDrag,
-                onDragEnd = onDragEnd
+                onDragEnd = onDragEnd,
+                onTap = onTap
             )
         }
     }
@@ -275,7 +320,8 @@ fun DraggableTaskCard(
     isDragging: Boolean,
     onDragStart: (Task, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit
+    onDragEnd: () -> Unit,
+    onTap: (Task) -> Unit
 ) {
     val course = TaskRepository.courses.find { it.id == task.courseId }
     val courseColor = course?.color?.let {
@@ -294,6 +340,7 @@ fun DraggableTaskCard(
             .onGloballyPositioned { coords ->
                 cardWindowPosition = coords.positionInWindow()
             }
+            .clickable { onTap(task) }
             .pointerInput(task) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { localOffset ->
@@ -437,4 +484,111 @@ fun AddTaskDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditTaskDialog(
+    task: Task,
+    onDismiss: () -> Unit,
+    onSave: (Task) -> Unit,
+    onDelete: (Task) -> Unit
+) {
+    val courses = TaskRepository.courses
+    var title by remember { mutableStateOf(task.title) }
+    var selectedCourseId by remember { mutableStateOf(task.courseId) }
+    var selectedStatus by remember { mutableStateOf(task.status) }
+    var expanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Task") },
+            text = { Text("Are you sure you want to delete \"${task.title}\"?") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(task) }) {
+                    Text("Delete", color = Color(0xFFE53935))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Edit Task", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Task title") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        OutlinedTextField(
+                            value = courses.find { it.id == selectedCourseId }?.name ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Course") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            courses.forEach { course ->
+                                DropdownMenuItem(
+                                    text = { Text(course.name) },
+                                    onClick = {
+                                        selectedCourseId = course.id
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TaskStatus.entries.forEach { status ->
+                            FilterChip(
+                                selected = selectedStatus == status,
+                                onClick = { selectedStatus = status },
+                                label = { Text(status.name, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showDeleteConfirm = true }) {
+                        Text("Delete", color = Color(0xFFE53935))
+                    }
+                    TextButton(
+                        onClick = {
+                            if (title.isNotBlank()) {
+                                onSave(task.copy(
+                                    title = title.trim(),
+                                    courseId = selectedCourseId,
+                                    status = selectedStatus
+                                ))
+                            }
+                        }
+                    ) { Text("Save") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        )
+    }
 }
