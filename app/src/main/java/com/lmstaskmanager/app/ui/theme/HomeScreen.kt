@@ -25,6 +25,12 @@ import com.lmstaskmanager.app.model.Task
 import com.lmstaskmanager.app.model.TaskStatus
 import com.lmstaskmanager.app.repository.TaskRepository
 import kotlin.math.roundToInt
+import androidx.compose.runtime.LaunchedEffect
+import com.lmstaskmanager.app.database.DatabaseManager
+import com.lmstaskmanager.app.model.DataSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 data class DragState(
     val isDragging: Boolean = false,
@@ -34,10 +40,25 @@ data class DragState(
 
 @Composable
 fun HomeScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var tasks by remember { mutableStateOf(TaskRepository.tasks.toList()) }
     var dragState by remember { mutableStateOf(DragState()) }
     val columnBounds = remember { mutableMapOf<TaskStatus, androidx.compose.ui.geometry.Rect>() }
     val density = LocalDensity.current
+
+    LaunchedEffect(Unit) {
+        val db = DatabaseManager.getDatabase(context)
+        val entities = db.taskDao().getAllTasks()
+        tasks = entities.map { entity ->
+            Task(
+                id = entity.id,
+                title = entity.title,
+                status = TaskStatus.valueOf(entity.status),
+                courseId = entity.courseId,
+                source = DataSource.valueOf(entity.source)
+            )
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -78,6 +99,11 @@ fun HomeScreen() {
                                     if (it.id == task.id) it.copy(status = newStatus) else it
                                 }
                                 TaskRepository.updateTaskStatus(task.id, newStatus)
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    DatabaseManager.getDatabase(context)
+                                        .taskDao()
+                                        .updateTaskStatus(task.id, newStatus.name)
+                                }
                             }
                         }
                         dragState = DragState()
