@@ -1,5 +1,6 @@
 package com.lmstaskmanager.app.ui.theme
 
+import java.util.UUID
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -19,7 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lmstaskmanager.app.database.TaskEntity
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.zIndex
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.core.graphics.toColorInt
 import com.lmstaskmanager.app.model.Task
 import com.lmstaskmanager.app.model.TaskStatus
@@ -38,6 +42,7 @@ data class DragState(
     val dragPosition: Offset = Offset.Zero
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -45,6 +50,7 @@ fun HomeScreen() {
     var dragState by remember { mutableStateOf(DragState()) }
     val columnBounds = remember { mutableMapOf<TaskStatus, androidx.compose.ui.geometry.Rect>() }
     val density = LocalDensity.current
+    var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val db = DatabaseManager.getDatabase(context)
@@ -69,11 +75,16 @@ fun HomeScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text(
-                    text = "My Tasks",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "My Tasks", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Button(onClick = { showAddDialog = true }) {
+                        Text("+ Add Task")
+                    }
+                }
             }
             item {
                 KanbanBoard(
@@ -113,6 +124,27 @@ fun HomeScreen() {
                     }
                 )
             }
+        }
+
+        if (showAddDialog) {
+            AddTaskDialog(
+                onDismiss = { showAddDialog = false },
+                onConfirm = { newTask ->
+                    tasks = tasks + newTask
+                    CoroutineScope(Dispatchers.IO).launch {
+                        DatabaseManager.getDatabase(context).taskDao().upsertTask(
+                            TaskEntity(
+                                id = newTask.id,
+                                title = newTask.title,
+                                status = newTask.status.name,
+                                courseId = newTask.courseId,
+                                source = newTask.source.name
+                            )
+                        )
+                    }
+                    showAddDialog = false
+                }
+            )
         }
 
         // Drag shadow overlay
@@ -309,4 +341,100 @@ fun DraggableTaskCard(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddTaskDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Task) -> Unit
+) {
+    val courses = TaskRepository.courses
+    var title by remember { mutableStateOf("") }
+    var selectedCourseId by remember { mutableStateOf(courses.first().id) }
+    var selectedStatus by remember { mutableStateOf(TaskStatus.TODO) }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New Task", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Task title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Course dropdown
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = courses.find { it.id == selectedCourseId }?.name ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Course") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        courses.forEach { course ->
+                            DropdownMenuItem(
+                                text = { Text(course.name) },
+                                onClick = {
+                                    selectedCourseId = course.id
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Status selector
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TaskStatus.entries.forEach { status ->
+                        FilterChip(
+                            selected = selectedStatus == status,
+                            onClick = { selectedStatus = status },
+                            label = {
+                                Text(
+                                    text = status.name,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(
+                            Task(
+                                id = UUID.randomUUID().toString(),
+                                title = title.trim(),
+                                status = selectedStatus,
+                                courseId = selectedCourseId,
+                                source = DataSource.LOCAL
+                            )
+                        )
+                    }
+                }
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
