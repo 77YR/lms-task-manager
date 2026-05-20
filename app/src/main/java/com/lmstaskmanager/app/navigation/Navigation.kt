@@ -11,6 +11,7 @@ import com.lmstaskmanager.app.ui.theme.BottomNavBar
 import com.lmstaskmanager.app.ui.theme.CoursesScreen
 import com.lmstaskmanager.app.ui.theme.HomeScreen
 import com.lmstaskmanager.app.ui.theme.ScheduleScreen
+import com.lmstaskmanager.app.ui.theme.AssignmentsScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
