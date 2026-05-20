@@ -16,6 +16,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Schedule : Screen("schedule")
     object Courses : Screen("courses")
+    object Assignments : Screen("assignments")
 }
 
 @Composable
@@ -38,6 +39,9 @@ fun AppNavigation() {
             }
             composable(Screen.Courses.route) {
                 CoursesScreen()
+            }
+            composable(Screen.Assignments.route) {
+                AssignmentsScreen()
             }
         }
     }

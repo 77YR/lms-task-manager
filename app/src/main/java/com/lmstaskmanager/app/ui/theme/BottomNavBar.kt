@@ -1,6 +1,7 @@
 package com.lmstaskmanager.app.ui.theme
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.School
@@ -16,7 +17,8 @@ fun BottomNavBar(navController: NavController) {
     val items = listOf(
         Triple(Screen.Home, Icons.Filled.Home, "Home"),
         Triple(Screen.Schedule, Icons.Filled.CalendarMonth, "Schedule"),
-        Triple(Screen.Courses, Icons.Filled.School, "Courses")
+        Triple(Screen.Courses, Icons.Filled.School, "Courses"),
+        Triple(Screen.Assignments, Icons.AutoMirrored.Filled.Assignment, "Assignments")
     )
 
     NavigationBar {
