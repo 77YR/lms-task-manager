@@ -12,12 +12,16 @@ import com.lmstaskmanager.app.ui.theme.CoursesScreen
 import com.lmstaskmanager.app.ui.theme.HomeScreen
 import com.lmstaskmanager.app.ui.theme.ScheduleScreen
 import com.lmstaskmanager.app.ui.theme.AssignmentsScreen
+import com.lmstaskmanager.app.ui.theme.CourseDetailScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Schedule : Screen("schedule")
     object Courses : Screen("courses")
     object Assignments : Screen("assignments")
+    object CourseDetail : Screen("course/{courseId}") {
+        fun createRoute(courseId: String) = "course/$courseId"
+    }
 }
 
 @Composable
@@ -43,6 +47,16 @@ fun AppNavigation() {
             }
             composable(Screen.Assignments.route) {
                 AssignmentsScreen()
+            }
+            composable(Screen.CourseDetail.route) { backStackEntry ->
+                val courseId = backStackEntry.arguments?.getString("courseId") ?: return@composable
+                CourseDetailScreen(
+                    courseId = courseId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Courses.route) {
+                CoursesScreen(navController = navController)
             }
         }
     }

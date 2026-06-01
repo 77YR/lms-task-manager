@@ -2,6 +2,7 @@ package com.lmstaskmanager.app.ui.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,10 +17,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import androidx.navigation.NavController
+import com.lmstaskmanager.app.navigation.Screen
 import com.lmstaskmanager.app.repository.TaskRepository
 
 @Composable
-fun CoursesScreen() {
+fun CoursesScreen(navController: NavController) {
     val courses = TaskRepository.courses
     val assignments = TaskRepository.assignments
 
@@ -49,7 +52,7 @@ fun CoursesScreen() {
                 val courseColor = Color(course.color.toColorInt())
 
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable{navController.navigate(Screen.CourseDetail.createRoute(course.id))},
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = White),
                     elevation = CardDefaults.cardElevation(0.dp),
