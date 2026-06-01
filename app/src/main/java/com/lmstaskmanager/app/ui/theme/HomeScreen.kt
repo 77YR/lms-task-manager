@@ -410,7 +410,9 @@ fun DraggableTaskCard(
                 Text(
                     text = course?.name ?: "",
                     fontSize = 10.sp,
-                    color = if (isDragging) Color.Transparent else Gray500
+                    color = if (isDragging) Color.Transparent else Gray500,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }
