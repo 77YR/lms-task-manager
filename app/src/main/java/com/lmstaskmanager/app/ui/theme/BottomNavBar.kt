@@ -19,8 +19,7 @@ fun BottomNavBar(navController: NavController) {
         Triple(Screen.Home, Icons.Filled.Home, "Home"),
         Triple(Screen.Assignments, Icons.AutoMirrored.Filled.Assignment, "Assignments"),
         Triple(Screen.Schedule, Icons.Filled.CalendarMonth, "Schedule"),
-        Triple(Screen.Courses, Icons.Filled.School, "Courses"),
-        Triple(Screen.Settings, Icons.Filled.Settings, "Settings")
+        Triple(Screen.Courses, Icons.Filled.School, "Courses")
     )
 
     NavigationBar {

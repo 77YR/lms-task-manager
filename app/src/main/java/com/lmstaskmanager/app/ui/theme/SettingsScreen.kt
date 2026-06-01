@@ -62,7 +62,7 @@ fun SettingsScreen() {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Auto-delete completed items",
                                 fontSize = 15.sp,
@@ -75,6 +75,7 @@ fun SettingsScreen() {
                                 color = Gray500
                             )
                         }
+                        Spacer(modifier = Modifier.width(16.dp))
                         Switch(
                             checked = autoDeleteEnabled,
                             onCheckedChange = {

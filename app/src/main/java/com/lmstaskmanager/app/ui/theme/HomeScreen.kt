@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.Settings
+import com.lmstaskmanager.app.navigation.Screen
 
 data class DragState(
     val isDragging: Boolean = false,
@@ -46,7 +49,7 @@ data class DragState(
 )
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(navController: androidx.navigation.NavController) {
     val context = LocalContext.current
     var tasks by remember { mutableStateOf(emptyList<Task>()) }
     var dragState by remember { mutableStateOf(DragState()) }
@@ -81,12 +84,25 @@ fun HomeScreen() {
                         .background(Blue600)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Text(
-                        text = "My Tasks",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = White
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "My Tasks",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = White
+                        )
+                        IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = "Settings",
+                                tint = White
+                            )
+                        }
+                    }
                 }
             }
 
