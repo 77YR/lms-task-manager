@@ -1,9 +1,11 @@
 package com.lmstaskmanager.app.ui.theme
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,57 +23,67 @@ fun CoursesScreen() {
     val courses = TaskRepository.courses
     val assignments = TaskRepository.assignments
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
+    Column(modifier = Modifier.fillMaxSize().background(Gray50)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Blue600)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
             Text(
-                text = "My Courses",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                text = "Courses",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = White
             )
         }
-        items(courses) { course ->
-            val courseAssignments = assignments.filter { it.courseId == course.id }
-            val courseColor = Color(course.color.toColorInt())
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(courses) { course ->
+                val courseAssignments = assignments.filter { it.courseId == course.id }
+                val courseColor = Color(course.color.toColorInt())
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = White),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
                     Row(
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
-                                .background(courseColor, RoundedCornerShape(4.dp))
+                                .size(12.dp)
+                                .background(courseColor, CircleShape)
                         )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = course.name,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp,
+                                color = Gray900
+                            )
+                            Text(
+                                text = course.teacher,
+                                fontSize = 12.sp,
+                                color = Gray500
+                            )
+                        }
                         Text(
-                            text = course.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            text = "${courseAssignments.size} assignments",
+                            fontSize = 11.sp,
+                            color = Gray400
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = course.teacher,
-                        fontSize = 13.sp,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "${courseAssignments.size} assignment(s)",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
                 }
             }
         }
