@@ -3,6 +3,8 @@ package com.lmstaskmanager.app.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import com.lmstaskmanager.app.settings.AppSettings
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
 
     var autoDeleteEnabled by remember {
@@ -32,14 +34,26 @@ fun SettingsScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Blue600)
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = 4.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = "Settings",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = White
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = White
+                    )
+                }
+                Text(
+                    text = "Settings",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = White
+                )
+            }
         }
 
         Column(

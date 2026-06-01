@@ -61,7 +61,7 @@ fun AppNavigation() {
                 CoursesScreen(navController = navController)
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(onBack = {navController.popBackStack()})
             }
         }
     }
