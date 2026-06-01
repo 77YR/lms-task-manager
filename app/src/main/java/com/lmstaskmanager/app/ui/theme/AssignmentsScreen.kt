@@ -1,9 +1,11 @@
 package com.lmstaskmanager.app.ui.theme
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -21,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import com.lmstaskmanager.app.database.AssignmentEntity
 import com.lmstaskmanager.app.database.DatabaseManager
+import com.lmstaskmanager.app.model.Course
+import com.lmstaskmanager.app.repository.TaskRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,132 +39,134 @@ fun AssignmentsScreen() {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val db = DatabaseManager.getDatabase(context)
-            assignments = db.assignmentDao().getAllAssignments()
+            assignments = DatabaseManager.getDatabase(context)
+                .assignmentDao()
+                .getAllAssignments()
                 .sortedBy { it.dueDate }
         }
     }
 
-    val courses = com.lmstaskmanager.app.repository.TaskRepository.courses
+    val courses = TaskRepository.courses
     val now = System.currentTimeMillis()
-
     val overdue = assignments.filter { !it.completed && it.dueDate < now }
     val upcoming = assignments.filter { !it.completed && it.dueDate >= now }
     val completed = assignments.filter { it.completed }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Text("Assignments", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+    fun toggle(assignment: AssignmentEntity) {
+        val updated = assignment.copy(completed = !assignment.completed)
+        assignments = assignments.map { if (it.id == updated.id) updated else it }
+        CoroutineScope(Dispatchers.IO).launch {
+            DatabaseManager.getDatabase(context).assignmentDao().upsertAssignment(updated)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(Gray50)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Blue600)
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = "Assignments",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = White
+            )
         }
 
-        if (overdue.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Overdue",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFE53935)
-                )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            if (overdue.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Overdue", color = Red500)
+                }
+                items(overdue) { assignment ->
+                    AssignmentCard(
+                        assignment = assignment,
+                        courses = courses,
+                        isOverdue = true,
+                        onToggle = { toggle(it) }
+                    )
+                }
             }
-            items(overdue) { assignment ->
-                AssignmentCard(
-                    assignment = assignment,
-                    courses = courses,
-                    isOverdue = true,
-                    onToggleComplete = { updated ->
-                        assignments = assignments.map {
-                            if (it.id == updated.id) updated else it
-                        }
-                        CoroutineScope(Dispatchers.IO).launch {
-                            DatabaseManager.getDatabase(context)
-                                .assignmentDao()
-                                .upsertAssignment(updated)
-                        }
-                    }
-                )
-            }
-        }
 
-        if (upcoming.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Upcoming",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1E88E5)
-                )
+            if (upcoming.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Upcoming", color = Blue600)
+                }
+                items(upcoming) { assignment ->
+                    AssignmentCard(
+                        assignment = assignment,
+                        courses = courses,
+                        isOverdue = false,
+                        onToggle = { toggle(it) }
+                    )
+                }
             }
-            items(upcoming) { assignment ->
-                AssignmentCard(
-                    assignment = assignment,
-                    courses = courses,
-                    isOverdue = false,
-                    onToggleComplete = { updated ->
-                        assignments = assignments.map {
-                            if (it.id == updated.id) updated else it
-                        }
-                        CoroutineScope(Dispatchers.IO).launch {
-                            DatabaseManager.getDatabase(context)
-                                .assignmentDao()
-                                .upsertAssignment(updated)
-                        }
-                    }
-                )
-            }
-        }
 
-        if (completed.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Completed",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Gray
-                )
+            if (completed.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Completed", color = Gray400)
+                }
+                items(completed) { assignment ->
+                    AssignmentCard(
+                        assignment = assignment,
+                        courses = courses,
+                        isOverdue = false,
+                        onToggle = { toggle(it) }
+                    )
+                }
             }
-            items(completed) { assignment ->
-                AssignmentCard(
-                    assignment = assignment,
-                    courses = courses,
-                    isOverdue = false,
-                    onToggleComplete = { updated ->
-                        assignments = assignments.map {
-                            if (it.id == updated.id) updated else it
-                        }
-                        CoroutineScope(Dispatchers.IO).launch {
-                            DatabaseManager.getDatabase(context)
-                                .assignmentDao()
-                                .upsertAssignment(updated)
-                        }
+
+            if (assignments.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Gray200, RoundedCornerShape(8.dp))
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No assignments", fontSize = 14.sp, color = Gray300)
                     }
-                )
+                }
             }
         }
     }
 }
 
 @Composable
+fun SectionHeader(title: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color)
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Gray200)
+    }
+}
+
+@Composable
 fun AssignmentCard(
     assignment: AssignmentEntity,
-    courses: List<com.lmstaskmanager.app.model.Course>,
+    courses: List<Course>,
     isOverdue: Boolean,
-    onToggleComplete: (AssignmentEntity) -> Unit
+    onToggle: (AssignmentEntity) -> Unit
 ) {
     val course = courses.find { it.id == assignment.courseId }
-    val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Color.Gray
+    val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Gray300
     val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     val dueText = dateFormat.format(Date(assignment.dueDate))
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        colors = CardDefaults.cardColors(containerColor = White),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = CardDefaults.outlinedCardBorder()
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -169,10 +175,10 @@ fun AssignmentCard(
         ) {
             Box(
                 modifier = Modifier
-                    .width(4.dp)
-                    .height(48.dp)
+                    .width(3.dp)
+                    .height(44.dp)
                     .background(
-                        if (isOverdue) Color(0xFFE53935) else courseColor,
+                        if (isOverdue) Red500 else courseColor,
                         RoundedCornerShape(2.dp)
                     )
             )
@@ -181,32 +187,34 @@ fun AssignmentCard(
                     text = assignment.title,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
+                    color = if (assignment.completed) Gray400 else Gray900,
                     textDecoration = if (assignment.completed)
-                        TextDecoration.LineThrough else TextDecoration.None,
-                    color = if (assignment.completed) Color.Gray else Color.Unspecified
+                        TextDecoration.LineThrough else TextDecoration.None
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(courseColor, CircleShape)
+                    )
+                    Text(text = course?.name ?: "", fontSize = 11.sp, color = Gray500)
+                }
                 Text(
-                    text = course?.name ?: "No Course",
-                    fontSize = 12.sp,
-                    color = courseColor
-                )
-                Text(
-                    text = "Due: $dueText",
+                    text = "Due $dueText",
                     fontSize = 11.sp,
-                    color = if (isOverdue) Color(0xFFE53935) else Color.Gray
+                    color = if (isOverdue) Red500 else Gray400
                 )
             }
-            IconButton(
-                onClick = {
-                    onToggleComplete(assignment.copy(completed = !assignment.completed))
-                }
-            ) {
+            IconButton(onClick = { onToggle(assignment) }) {
                 Icon(
                     imageVector = if (assignment.completed)
                         Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                    contentDescription = "Toggle complete",
-                    tint = if (assignment.completed) Color(0xFF43A047) else Color.Gray
+                    contentDescription = "Toggle",
+                    tint = if (assignment.completed) Green500 else Gray300
                 )
             }
         }
