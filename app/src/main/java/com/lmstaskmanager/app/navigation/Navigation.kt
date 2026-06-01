@@ -43,7 +43,7 @@ fun AppNavigation() {
                 ScheduleScreen()
             }
             composable(Screen.Courses.route) {
-                CoursesScreen()
+                CoursesScreen(navController = navController)
             }
             composable(Screen.Assignments.route) {
                 AssignmentsScreen()
