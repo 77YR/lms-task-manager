@@ -2,40 +2,42 @@ package com.lmstaskmanager.app.ui.theme
 
 import java.util.UUID
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lmstaskmanager.app.database.TaskEntity
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.core.graphics.toColorInt
+import com.lmstaskmanager.app.database.DatabaseManager
+import com.lmstaskmanager.app.database.TaskEntity
+import com.lmstaskmanager.app.model.DataSource
 import com.lmstaskmanager.app.model.Task
 import com.lmstaskmanager.app.model.TaskStatus
 import com.lmstaskmanager.app.repository.TaskRepository
-import kotlin.math.roundToInt
-import androidx.compose.runtime.LaunchedEffect
-import com.lmstaskmanager.app.database.DatabaseManager
-import com.lmstaskmanager.app.model.DataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 data class DragState(
     val isDragging: Boolean = false,
@@ -43,11 +45,10 @@ data class DragState(
     val dragPosition: Offset = Offset.Zero
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var tasks by remember { mutableStateOf(TaskRepository.tasks.toList()) }
+    val context = LocalContext.current
+    var tasks by remember { mutableStateOf(emptyList<Task>()) }
     var dragState by remember { mutableStateOf(DragState()) }
     val columnBounds = remember { mutableMapOf<TaskStatus, androidx.compose.ui.geometry.Rect>() }
     val density = LocalDensity.current
@@ -56,8 +57,7 @@ fun HomeScreen() {
 
     LaunchedEffect(Unit) {
         val db = DatabaseManager.getDatabase(context)
-        val entities = db.taskDao().getAllTasks()
-        tasks = entities.map { entity ->
+        tasks = db.taskDao().getAllTasks().map { entity ->
             Task(
                 id = entity.id,
                 title = entity.title,
@@ -68,67 +68,88 @@ fun HomeScreen() {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Gray50)) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            // Header
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Blue600)
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Text(text = "My Tasks", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Button(onClick = { showAddDialog = true }) {
-                        Text("+ Add Task")
-                    }
+                    Text(
+                        text = "My Tasks",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = White
+                    )
                 }
             }
+
+            // Add button + Kanban
             item {
-                KanbanBoard(
-                    tasks = tasks,
-                    dragState = dragState,
-                    onDragStart = { task, globalOffset ->
-                        dragState = DragState(true, task, globalOffset)
-                    },
-                    onDrag = { dragAmount ->
-                        dragState = dragState.copy(
-                            dragPosition = dragState.dragPosition + dragAmount
-                        )
-                    },
-                    onDragEnd = {
-                        dragState.draggedTask?.let { task ->
-                            val pos = dragState.dragPosition
-                            val newStatus = columnBounds.entries.firstOrNull { (_, bounds) ->
-                                pos.x in bounds.left..bounds.right &&
-                                        pos.y in bounds.top..bounds.bottom
-                            }?.key
-                            if (newStatus != null && newStatus != task.status) {
-                                tasks = tasks.map {
-                                    if (it.id == task.id) it.copy(status = newStatus) else it
-                                }
-                                TaskRepository.updateTaskStatus(task.id, newStatus)
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    DatabaseManager.getDatabase(context)
-                                        .taskDao()
-                                        .updateTaskStatus(task.id, newStatus.name)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showAddDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Blue600
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Gray200)
+                    ) {
+                        Text("+ New Task", fontSize = 14.sp)
+                    }
+
+                    KanbanBoard(
+                        tasks = tasks,
+                        dragState = dragState,
+                        onDragStart = { task, globalOffset ->
+                            dragState = DragState(true, task, globalOffset)
+                        },
+                        onDrag = { dragAmount ->
+                            dragState = dragState.copy(
+                                dragPosition = dragState.dragPosition + dragAmount
+                            )
+                        },
+                        onDragEnd = {
+                            dragState.draggedTask?.let { task ->
+                                val pos = dragState.dragPosition
+                                val newStatus = columnBounds.entries.firstOrNull { (_, bounds) ->
+                                    pos.x in bounds.left..bounds.right &&
+                                            pos.y in bounds.top..bounds.bottom
+                                }?.key
+                                if (newStatus != null && newStatus != task.status) {
+                                    tasks = tasks.map {
+                                        if (it.id == task.id) it.copy(status = newStatus) else it
+                                    }
+                                    TaskRepository.updateTaskStatus(task.id, newStatus)
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        DatabaseManager.getDatabase(context)
+                                            .taskDao()
+                                            .updateTaskStatus(task.id, newStatus.name)
+                                    }
                                 }
                             }
+                            dragState = DragState()
+                        },
+                        onTap = { task -> selectedTask = task },
+                        onColumnBoundsChanged = { status, bounds ->
+                            columnBounds[status] = bounds
                         }
-                        dragState = DragState()
-                    },
-                    onTap = { task -> selectedTask = task },
-                    onColumnBoundsChanged = { status, bounds ->
-                        columnBounds[status] = bounds
-                    }
-                )
+                    )
+                }
             }
         }
 
+        // Edit dialog
         selectedTask?.let { task ->
             EditTaskDialog(
                 task = task,
@@ -167,6 +188,7 @@ fun HomeScreen() {
             )
         }
 
+        // Add dialog
         if (showAddDialog) {
             AddTaskDialog(
                 onDismiss = { showAddDialog = false },
@@ -188,41 +210,42 @@ fun HomeScreen() {
             )
         }
 
-        // Drag shadow overlay
+        // Drag shadow
         if (dragState.isDragging && dragState.draggedTask != null) {
             val task = dragState.draggedTask!!
             val course = TaskRepository.courses.find { it.id == task.courseId }
-            val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Color.Gray
+            val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Gray300
 
             Card(
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(140.dp)
                     .zIndex(10f)
                     .offset {
                         IntOffset(
-                            (dragState.dragPosition.x - with(density) { 60.dp.toPx() }).roundToInt(),
+                            (dragState.dragPosition.x - with(density) { 70.dp.toPx() }).roundToInt(),
                             (dragState.dragPosition.y - with(density) { 30.dp.toPx() }).roundToInt()
                         )
                     },
-                shape = RoundedCornerShape(6.dp),
-                elevation = CardDefaults.cardElevation(12.dp)
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = White),
+                elevation = CardDefaults.cardElevation(8.dp)
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text(
-                        text = task.title,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(courseColor, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(text = task.title, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(courseColor, CircleShape)
+                        )
                         Text(
-                            text = course?.name ?: "No Course",
-                            fontSize = 9.sp,
-                            color = Color.White
+                            text = course?.name ?: "",
+                            fontSize = 10.sp,
+                            color = Gray500
                         )
                     }
                 }
@@ -281,35 +304,52 @@ fun KanbanColumn(
     onTap: (Task) -> Unit,
     onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit
 ) {
-    val isDropTarget = dragState.isDragging &&
-            dragState.draggedTask?.status != status
+    val isDropTarget = dragState.isDragging && dragState.draggedTask?.status != status
 
     Column(
         modifier = modifier
-            .onGloballyPositioned { coords ->
-                onBoundsChanged(coords.boundsInWindow())
-            }
+            .onGloballyPositioned { coords -> onBoundsChanged(coords.boundsInWindow()) }
             .background(
-                if (isDropTarget) Color(0xFFBBDEFB) else Color(0xFFE0E0E0),
-                RoundedCornerShape(8.dp)
+                if (isDropTarget) Blue100 else Gray100,
+                RoundedCornerShape(10.dp)
+            )
+            .then(
+                if (isDropTarget) Modifier.border(1.dp, Blue600, RoundedCornerShape(10.dp))
+                else Modifier
             )
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(
-            text = label,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp
-        )
-        tasks.forEach { task ->
-            DraggableTaskCard(
-                task = task,
-                isDragging = dragState.draggedTask?.id == task.id,
-                onDragStart = onDragStart,
-                onDrag = onDrag,
-                onDragEnd = onDragEnd,
-                onTap = onTap
-            )
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Gray500)
+            Text(text = "${tasks.size}", fontSize = 11.sp, color = Gray400)
+        }
+
+        if (tasks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .border(1.dp, Gray200, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "Empty", fontSize = 11.sp, color = Gray300)
+            }
+        } else {
+            tasks.forEach { task ->
+                DraggableTaskCard(
+                    task = task,
+                    isDragging = dragState.draggedTask?.id == task.id,
+                    onDragStart = onDragStart,
+                    onDrag = onDrag,
+                    onDragEnd = onDragEnd,
+                    onTap = onTap
+                )
+            }
         }
     }
 }
@@ -324,66 +364,53 @@ fun DraggableTaskCard(
     onTap: (Task) -> Unit
 ) {
     val course = TaskRepository.courses.find { it.id == task.courseId }
-    val courseColor = course?.color?.let {
-        Color(it.toColorInt())
-    } ?: Color.Gray
-
+    val courseColor = course?.color?.let { Color(it.toColorInt()) } ?: Gray300
     var cardWindowPosition by remember { mutableStateOf(Offset.Zero) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isDragging) Modifier.background(Color.Transparent)
-                else Modifier
-            )
-            .onGloballyPositioned { coords ->
-                cardWindowPosition = coords.positionInWindow()
-            }
+            .onGloballyPositioned { coords -> cardWindowPosition = coords.positionInWindow() }
             .clickable { onTap(task) }
             .pointerInput(task) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { localOffset ->
-                        val globalOffset = cardWindowPosition + localOffset
-                        onDragStart(task, globalOffset)
+                        onDragStart(task, cardWindowPosition + localOffset)
                     },
-                    onDrag = { _, dragAmount ->
-                        onDrag(dragAmount)
-                    },
+                    onDrag = { _, dragAmount -> onDrag(dragAmount) },
                     onDragEnd = { onDragEnd() },
                     onDragCancel = { onDragEnd() }
                 )
             },
-        shape = RoundedCornerShape(6.dp),
-        elevation = CardDefaults.cardElevation(if (isDragging) 0.dp else 2.dp)
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isDragging) Gray100 else White),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = CardDefaults.outlinedCardBorder()
     ) {
-        Column(
-            modifier = Modifier
-                .padding(8.dp)
-                .then(
-                    if (isDragging) Modifier.background(Color(0xFFEEEEEE))
-                    else Modifier
-                )
-        ) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Text(
                 text = task.title,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (isDragging) Color.Transparent else Color.Unspecified
+                color = if (isDragging) Color.Transparent else Gray900
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .background(
-                        if (isDragging) Color.Transparent else courseColor,
-                        RoundedCornerShape(4.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            if (isDragging) Color.Transparent else courseColor,
+                            CircleShape
+                        )
+                )
                 Text(
-                    text = course?.name ?: "No Course",
-                    fontSize = 9.sp,
-                    color = Color.Transparent
+                    text = course?.name ?: "",
+                    fontSize = 10.sp,
+                    color = if (isDragging) Color.Transparent else Gray500
                 )
             }
         }
@@ -404,7 +431,7 @@ fun AddTaskDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Task", fontWeight = FontWeight.Bold) },
+        title = { Text("New Task", fontWeight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -412,10 +439,9 @@ fun AddTaskDialog(
                     onValueChange = { title = it },
                     label = { Text("Task title") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
                 )
-
-                // Course dropdown
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
@@ -426,9 +452,8 @@ fun AddTaskDialog(
                         readOnly = true,
                         label = { Text("Course") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor()
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(8.dp)
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -436,52 +461,38 @@ fun AddTaskDialog(
                     ) {
                         courses.forEach { course ->
                             DropdownMenuItem(
-                                text = { Text(course.name) },
-                                onClick = {
-                                    selectedCourseId = course.id
-                                    expanded = false
-                                }
+                                text = { Text(course.name, fontSize = 14.sp) },
+                                onClick = { selectedCourseId = course.id; expanded = false }
                             )
                         }
                     }
                 }
-
-                // Status selector
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TaskStatus.entries.forEach { status ->
                         FilterChip(
                             selected = selectedStatus == status,
                             onClick = { selectedStatus = status },
-                            label = {
-                                Text(
-                                    text = status.name,
-                                    fontSize = 11.sp
-                                )
-                            }
+                            label = { Text(status.name, fontSize = 11.sp) }
                         )
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    if (title.isNotBlank()) {
-                        onConfirm(
-                            Task(
-                                id = UUID.randomUUID().toString(),
-                                title = title.trim(),
-                                status = selectedStatus,
-                                courseId = selectedCourseId,
-                                source = DataSource.LOCAL
-                            )
-                        )
-                    }
+            TextButton(onClick = {
+                if (title.isNotBlank()) {
+                    onConfirm(Task(
+                        id = UUID.randomUUID().toString(),
+                        title = title.trim(),
+                        status = selectedStatus,
+                        courseId = selectedCourseId,
+                        source = DataSource.LOCAL
+                    ))
                 }
-            ) { Text("Add") }
+            }) { Text("Add", color = Blue600) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = Gray500) }
         }
     )
 }
@@ -505,10 +516,10 @@ fun EditTaskDialog(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete Task") },
-            text = { Text("Are you sure you want to delete \"${task.title}\"?") },
+            text = { Text("Delete \"${task.title}\"?") },
             confirmButton = {
                 TextButton(onClick = { onDelete(task) }) {
-                    Text("Delete", color = Color(0xFFE53935))
+                    Text("Delete", color = Red500)
                 }
             },
             dismissButton = {
@@ -518,7 +529,7 @@ fun EditTaskDialog(
     } else {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Edit Task", fontWeight = FontWeight.Bold) },
+            title = { Text("Edit Task", fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -526,7 +537,8 @@ fun EditTaskDialog(
                         onValueChange = { title = it },
                         label = { Text("Task title") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp)
                     )
                     ExposedDropdownMenuBox(
                         expanded = expanded,
@@ -538,9 +550,8 @@ fun EditTaskDialog(
                             readOnly = true,
                             label = { Text("Course") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            shape = RoundedCornerShape(8.dp)
                         )
                         ExposedDropdownMenu(
                             expanded = expanded,
@@ -548,16 +559,13 @@ fun EditTaskDialog(
                         ) {
                             courses.forEach { course ->
                                 DropdownMenuItem(
-                                    text = { Text(course.name) },
-                                    onClick = {
-                                        selectedCourseId = course.id
-                                        expanded = false
-                                    }
+                                    text = { Text(course.name, fontSize = 14.sp) },
+                                    onClick = { selectedCourseId = course.id; expanded = false }
                                 )
                             }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TaskStatus.entries.forEach { status ->
                             FilterChip(
                                 selected = selectedStatus == status,
@@ -571,23 +579,21 @@ fun EditTaskDialog(
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { showDeleteConfirm = true }) {
-                        Text("Delete", color = Color(0xFFE53935))
+                        Text("Delete", color = Red500)
                     }
-                    TextButton(
-                        onClick = {
-                            if (title.isNotBlank()) {
-                                onSave(task.copy(
-                                    title = title.trim(),
-                                    courseId = selectedCourseId,
-                                    status = selectedStatus
-                                ))
-                            }
+                    TextButton(onClick = {
+                        if (title.isNotBlank()) {
+                            onSave(task.copy(
+                                title = title.trim(),
+                                courseId = selectedCourseId,
+                                status = selectedStatus
+                            ))
                         }
-                    ) { Text("Save") }
+                    }) { Text("Save", color = Blue600) }
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = Gray500) }
             }
         )
     }
