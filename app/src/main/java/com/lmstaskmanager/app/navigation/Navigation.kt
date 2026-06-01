@@ -13,6 +13,7 @@ import com.lmstaskmanager.app.ui.theme.HomeScreen
 import com.lmstaskmanager.app.ui.theme.ScheduleScreen
 import com.lmstaskmanager.app.ui.theme.AssignmentsScreen
 import com.lmstaskmanager.app.ui.theme.CourseDetailScreen
+import com.lmstaskmanager.app.ui.theme.SettingsScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -22,6 +23,7 @@ sealed class Screen(val route: String) {
     object CourseDetail : Screen("course/{courseId}") {
         fun createRoute(courseId: String) = "course/$courseId"
     }
+    object Settings : Screen("settings")
 }
 
 @Composable
@@ -57,6 +59,9 @@ fun AppNavigation() {
             }
             composable(Screen.Courses.route) {
                 CoursesScreen(navController = navController)
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen()
             }
         }
     }
