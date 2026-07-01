@@ -29,4 +29,15 @@ object AppSettings {
 
     fun setTaskDeleteDays(context: Context, days: Int) =
         getPrefs(context).edit().putInt(KEY_TASK_DELETE_DAYS, days).apply()
+    fun isLoggedIn(context: Context): Boolean =
+        getPrefs(context).getBoolean("is_logged_in", false)
+
+    fun setLoggedIn(context: Context, loggedIn: Boolean) =
+        getPrefs(context).edit().putBoolean("is_logged_in", loggedIn).apply()
+
+    fun setSkippedLogin(context: Context, skipped: Boolean) =
+        getPrefs(context).edit().putBoolean("skipped_login", skipped).apply()
+
+    fun hasSkippedLogin(context: Context): Boolean =
+        getPrefs(context).getBoolean("skipped_login", false)
 }
