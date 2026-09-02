@@ -194,5 +194,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = White),
+            elevation = CardDefaults.cardElevation(0.dp),
+            border = CardDefaults.outlinedCardBorder()
+        ) {
+            TextButton(
+                onClick = {
+                    AppSettings.setLoggedIn(context, false)
+                    AppSettings.setSkippedLogin(context, false)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Sign out", color = Red500, fontSize = 14.sp)
+            }
+        }
     }
 }
+
